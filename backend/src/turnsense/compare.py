@@ -174,11 +174,17 @@ def compare_trials(
             "Unlabelled trials contribute latency only; task metrics use labelled trials."
         )
 
-    evaluation_set = (
-        SCENARIO_SET_ID
-        if types == {"simulated"}
-        else ("live-unlabelled" if types == {"live"} else "mixed")
-    )
+    if types == {"simulated"}:
+        evaluation_set = SCENARIO_SET_ID
+    elif types == {"replay"}:  # "manifest:<file>/<split_id>", without the recording id
+        sources = {
+            "/".join((t.annotations.source if t.annotations else "").split("/")[:2]) for t in trials
+        }
+        evaluation_set = "replay:" + ",".join(sorted(sources))
+    elif types == {"live"}:
+        evaluation_set = "live-unlabelled"
+    else:
+        evaluation_set = "mixed"
     return {
         "group_by": group_by,
         "groups": out_groups,

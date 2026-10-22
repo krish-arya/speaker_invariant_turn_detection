@@ -26,6 +26,8 @@ class Settings(BaseSettings):
     max_concurrent_sessions: int = 8
     # Labelled manifest for the replay scenario (research/data.py format); optional.
     replay_manifest: Path | None = None
+    # Optional split file: replay only its speaker-disjoint test_unseen recordings.
+    replay_split: Path | None = None
 
     # --- LiveKit (transport) -------------------------------------------------
     livekit_url: str | None = Field(

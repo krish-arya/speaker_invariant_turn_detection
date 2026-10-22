@@ -25,8 +25,9 @@ from turnsense.events import (
 )
 from turnsense.orchestrator.session import OrchestratorOptions
 from turnsense.runtime import SIM_PROVIDERS, build_effective_config, build_policy
+from turnsense.sim.replay import scenario_catalog
 from turnsense.sim.runner import SimulatedSession
-from turnsense.sim.scenarios import SCENARIOS, build_scenario
+from turnsense.sim.scenarios import BuiltScenario, ScenarioSpec
 from turnsense.sim.vtime import run_in_virtual_time
 from turnsense.tracing import iso, new_id, utc_now
 from turnsense.trial import TrialStore
@@ -75,10 +76,24 @@ class ManagedSession:
     finished: bool = False
 
 
+def load_catalog(settings: Settings) -> dict[str, ScenarioSpec]:
+    return scenario_catalog(settings.replay_manifest, settings.replay_split)
+
+
+def _build(catalog: dict[str, ScenarioSpec], scenario_id: str, seed: int) -> BuiltScenario:
+    spec = catalog[scenario_id]
+    if spec.build is None:
+        raise ApiError(400, f"Scenario '{scenario_id}' has no scripted user track")
+    return spec.build(seed)
+
+
 class SessionManager:
-    def __init__(self, settings: Settings, store: TrialStore) -> None:
+    def __init__(
+        self, settings: Settings, store: TrialStore, catalog: dict[str, ScenarioSpec]
+    ) -> None:
         self.settings = settings
         self.store = store
+        self.catalog = catalog
         self.sessions: dict[str, ManagedSession] = {}
         self._janitor: asyncio.Task[None] | None = None
 
@@ -99,7 +114,7 @@ class SessionManager:
         return sum(1 for s in self.sessions.values() if not s.finished)
 
     async def create(self, req: CreateSessionRequest) -> CreateSessionResponse:
-        spec = SCENARIOS.get(req.scenario_id)
+        spec = self.catalog.get(req.scenario_id)
         if spec is None:
             raise ApiError(400, f"Unknown scenario '{req.scenario_id}'")
         if req.transport.value not in spec.transports:
@@ -167,7 +182,7 @@ class SessionManager:
             )
 
         detector = create_detector(req.detector_mode, policy, self.settings.checkpoint_dir)
-        scenario = await asyncio.to_thread(build_scenario, req.scenario_id, seed)
+        scenario = await asyncio.to_thread(_build, self.catalog, req.scenario_id, seed)
         sim = SimulatedSession(
             info,
             scenario,
@@ -261,9 +276,12 @@ class EvaluationManager:
 
     MAX_RUNNING = 2
 
-    def __init__(self, settings: Settings, store: TrialStore) -> None:
+    def __init__(
+        self, settings: Settings, store: TrialStore, catalog: dict[str, ScenarioSpec]
+    ) -> None:
         self.settings = settings
         self.store = store
+        self.catalog = catalog
         self.jobs: dict[str, EvaluationJob] = {}
         self._lock = threading.Lock()
 
@@ -272,7 +290,7 @@ class EvaluationManager:
         if running >= self.MAX_RUNNING:
             raise ApiError(429, "Too many evaluations running; wait or stop one")
         for sid in req.scenario_ids:
-            spec = SCENARIOS.get(sid)
+            spec = self.catalog.get(sid)
             if spec is None or spec.build is None:
                 raise ApiError(400, f"Scenario '{sid}' cannot be run as a scripted evaluation")
         try:
@@ -322,7 +340,8 @@ class EvaluationManager:
             for repeat in range(req.repeats):
                 seed = req.seed + repeat
                 for scenario_id in req.scenario_ids:
-                    scenario = build_scenario(scenario_id, seed)  # identical audio for every mode
+                    # identical audio for every mode
+                    scenario = _build(self.catalog, scenario_id, seed)
                     for mode in req.detector_modes:
                         if job.stop.is_set():
                             st.status = "stopped"
@@ -340,7 +359,7 @@ class EvaluationManager:
             st.error = repr(exc)
 
     def _run_one(self, req, evaluation_id, mode, scenario, seed, policy) -> str:  # type: ignore[no-untyped-def]
-        spec = SCENARIOS[scenario.scenario_id]
+        spec = self.catalog[scenario.scenario_id]
         cfg = build_effective_config(
             detector_mode=mode,
             model_version=_model_version(self.settings, mode),

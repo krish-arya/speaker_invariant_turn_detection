@@ -115,23 +115,29 @@ class BargeInScores:
     reference_barge_ins: int
     missed_barge_ins: int
     missed_barge_in_rate: float | None
+    # onsets where the agent finished on its own inside the reaction window: nothing to act on
+    yielded_naturally: int = 0
     reaction_ms: list[float] = field(default_factory=list)
 
 
 def score_barge_ins(
-    agent_intervals: Sequence[tuple[float, float]],
+    agent_intervals: Sequence[tuple[float, float | None]],
     cancel_commits_ms: Sequence[float],
     reference_onsets_ms: Sequence[float],
     tol: Tolerance = DEFAULT_TOLERANCE,
 ) -> BargeInScores:
     """Score interruption handling.
 
-    ``agent_intervals``: (start, end) of each agent output interval (generation→playback end
-    or cancellation). ``cancel_commits_ms``: committed BARGE_IN times. ``reference_onsets_ms``:
-    annotated onsets of genuine user interruptions that fell inside an agent interval.
+    ``agent_intervals``: (start, end) of each agent output interval (committed turn end →
+    playback end or cancellation; end None = still active). ``cancel_commits_ms``: committed
+    BARGE_IN times. ``reference_onsets_ms``: onsets of genuine user interruptions that fell
+    inside an agent interval.
 
-    A cancel is *false* if no reference onset lies in ``[cancel - barge_in_ms, cancel]``.
-    A reference onset is *missed* if no cancel lies in ``[onset, onset + barge_in_ms]``.
+    * A cancel is *false* if no reference onset lies in ``[cancel - barge_in_ms, cancel]``.
+    * A reference onset is *missed* if no cancel lies in ``[onset, onset + barge_in_ms]`` and
+      the agent was still outputting when that window closed. If the agent's interval ended on
+      its own inside the window, the onset counts as *yielded naturally* and is excluded from
+      the missed-barge-in rate (there was nothing left to cancel).
     """
     cancels = sorted(cancel_commits_ms)
     onsets = sorted(reference_onsets_ms)
@@ -139,21 +145,27 @@ def score_barge_ins(
     for c in cancels:
         if not any(c - tol.barge_in_ms <= o <= c for o in onsets):
             false += 1
-    missed = 0
+    missed = yielded = 0
     reactions: list[float] = []
     for o in onsets:
         hits = [c for c in cancels if o <= c <= o + tol.barge_in_ms]
         if hits:
             reactions.append(hits[0] - o)
+            continue
+        ends = [e for s, e in agent_intervals if s <= o and (e is None or o < e)]
+        if ends and ends[0] is not None and ends[0] <= o + tol.barge_in_ms:
+            yielded += 1
         else:
             missed += 1
     n_int = len(agent_intervals)
+    actionable = len(onsets) - yielded
     return BargeInScores(
         agent_intervals=n_int,
         false_barge_ins=false,
         false_barge_in_rate=false / n_int if n_int else None,
         reference_barge_ins=len(onsets),
         missed_barge_ins=missed,
-        missed_barge_in_rate=missed / len(onsets) if onsets else None,
+        missed_barge_in_rate=missed / actionable if actionable else None,
+        yielded_naturally=yielded,
         reaction_ms=reactions,
     )

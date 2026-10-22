@@ -17,7 +17,13 @@ from fastapi.responses import JSONResponse, PlainTextResponse, Response
 from pydantic import BaseModel, Field
 
 from turnsense import __version__
-from turnsense.api.managers import ApiError, EvaluationManager, SessionManager, live_providers
+from turnsense.api.managers import (
+    ApiError,
+    EvaluationManager,
+    SessionManager,
+    live_providers,
+    load_catalog,
+)
 from turnsense.compare import (
     compare_trials,
     comparison_csv,
@@ -38,7 +44,6 @@ from turnsense.events import (
     PolicyConfig,
 )
 from turnsense.runtime import SIM_PROVIDERS, policy_limits
-from turnsense.sim.scenarios import SCENARIOS
 from turnsense.trial import TrialRecord, TrialStore
 
 log = logging.getLogger(__name__)
@@ -66,8 +71,9 @@ def _download(body: str | bytes, filename: str, media_type: str) -> Response:
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     store = TrialStore(settings.trials_dir)
-    sessions = SessionManager(settings, store)
-    evaluations = EvaluationManager(settings, store)
+    catalog = load_catalog(settings)
+    sessions = SessionManager(settings, store, catalog)
+    evaluations = EvaluationManager(settings, store, catalog)
     started = time.monotonic()
 
     @asynccontextmanager
@@ -137,7 +143,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     "labelled": s.labelled,
                     "transports": list(s.transports),
                 }
-                for s in SCENARIOS.values()
+                for s in catalog.values()
             ],
             "transports": {
                 "simulation": {"available": True, "reason": None},

@@ -168,3 +168,41 @@ Whatever is used, record:
 - Report the probe together with the task metrics and both reference points. Do not claim that speaker identity was "removed".
 - Report negative and mixed results in full. Never present synthetic results as evidence about real speakers. Never call a variant "best" because it is the proposed method.
 - Include the model versions (`turn-detector-{lc,at}-0.1.0+<hash>`), `split_id`, `dataset_id`, β, the AT layer(s), the seeds, the hardware and the run time.
+
+## 11. Results so far: synthetic smoke test only (2026-10-22)
+
+> **SYNTHETIC.** These results come from synthetic voices with an engineered confound and modelled provider latency. They show that the machinery works and how the mechanism behaves. They are not evidence about real speakers or about the hypothesis.
+
+Run: `backend/runs/synthetic-quick-v1/` (`pipeline --synthetic --quick`, seed 0, CPU, 414 s). Split `split-b16506d4a505`: 16 training speakers; 13 val_seen speakers; 8 test_unseen speakers who never appear in training. Models: `turn-detector-lc-0.1.0+25120ffb` (E1, β = 0) and `turn-detector-at-0.1.0+eeac6e93` (E2, β = 1, AT on `conv3`). A repeat run from scratch reproduced every task metric exactly.
+
+**Offline streaming evaluation (test_unseen).** The pipeline is VAD → detector → `DecisionPolicy`, with the same policy and tolerances for every detector. CIs are a speaker bootstrap.
+
+| detector | F1 | premature-end | delay p50 / p95 (ms) | F1 gap (seen − unseen) |
+|---|---:|---:|---:|---:|
+| E0 silence baseline | 0.845 [0.785, 0.917] | 30.4% | 706 / 716 | 0.006 [−0.082, 0.097] |
+| E1 learned control | 0.888 [0.837, 0.947] | 20.3% | 804 / 1040 | −0.019 [−0.091, 0.055] |
+| E2 anti-transfer | 0.883 [0.829, 0.944] | 21.5% | 797 / 986 | −0.004 [−0.081, 0.066] |
+
+**The same checkpoints through the full live pipeline.** These runs go through the orchestrator, generations and barge-in, in virtual time (`backend/scripts/run_comparison.py`; report in `pipeline_comparison.md`). Replaying the 16 test_unseen recordings gives F1 of 0.860 (E0), 0.898 (E1) and 0.893 (E2). Premature-end rates are 30.1%, 20.4% and 21.7%. These agree with the offline evaluation to within noise, which cross-checks the two code paths. On the five scripted scenarios with 5 seeds each, E1 and E2 make identical turn decisions: F1 0.931 for both, against 0.920 for E0. None of the 123 trials played a stale audio chunk. Learned-detector inference is 0.58–0.60 ms p50 and 1.4–1.6 ms p99 per 20 ms frame.
+
+**What this shows**
+
+1. **Learning helps with pauses, at a latency cost.** E1 and E2 cut premature endpointing by about a third compared with E0, using phrase-final prosody, but their p95 turn-end delay is about 300 ms worse. The CIs overlap at this sample size. That trade-off is the main E0-vs-learned result to test on real data.
+2. **E2 is indistinguishable from E1** on every task metric and on the generalisation gap.
+3. **The anti-transfer penalty is not binding here.** Even without the penalty, E1's Gram similarity to the speaker net is only cos² = 0.040, and the penalty takes it to 0.001. The speaker-leakage probe is unchanged: on test_unseen, linear speaker decoding is 92.7%/95.1% (E1, conv3/gru) against 97.6%/90.2% (E2), with a random-init reference of 85–90%. The penalty compares Gram matrices channel by channel between two independently initialised networks, whose channel orders are arbitrary. It can therefore be satisfied almost trivially without removing speaker information. This is consistent with the paper's formulation (§4). Whether it is a weakness of the method in this setting, or a consequence of our choices, is open.
+4. **The synthetic testbed did not create the condition the hypothesis needs.** E1 shows no seen/unseen gap despite the engineered confound. Prosody (80% reliable) apparently dominates the speaker shortcut. A testbed in which the control model does not degrade cannot show an improvement from E2.
+5. **Barge-in and backchannels are not differentiated by the learned models.** Barge-in uses the shared overlap rule by design (§2), so all variants inherit the baseline's false barge-ins on two-syllable backchannels (about 9% of agent turns in the scripted set).
+
+**Next steps, in order**
+
+1. Make the testbed discriminative before testing a fix. Lower `prosody_reliability`, or strengthen the confound, until E1 shows a significant seen/unseen gap. Report that calibration.
+2. Run the planned AT ablations:
+   - a β sweep (0.1, 1, 10);
+   - AT on `conv1`/`conv2` or several layers;
+   - `similarity="repo_rowwise"`;
+   - a stronger speaker net (the quick run reaches 0.336 val_seen accuracy against 0.062 chance);
+   - a warm-start variant that initialises E2 from the speaker net, so channels correspond. This is a documented deviation from the paper.
+
+   Run the gradient-reversal adversary (`--grl`) as a separate invariance baseline.
+3. Move to licensed, annotated real conversations (§9) with a fixed speaker-disjoint split, and freeze tolerances before unblinding the test set (§6).
+4. Consider a BACKCHANNEL head, so a learned model can address the false barge-in failure mode that all variants currently share.

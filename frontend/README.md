@@ -11,7 +11,7 @@ The wire contract is in [`../docs/api-contract.md`](../docs/api-contract.md), an
 
 ```bash
 npm install
-npm run dev          # http://localhost:5173 — proxies /api and /ws to http://localhost:8000
+npm run dev          # http://localhost:5173 — proxies /api and /ws to http://127.0.0.1:8000
 ```
 
 Start the backend API on port 8000 first. To point the dev proxy elsewhere, set `TURNSENSE_BACKEND=http://host:port npm run dev`.
@@ -27,7 +27,7 @@ Start the backend API on port 8000 first. To point the dev proxy elsewhere, set 
 | Variable | Default | Meaning |
 |---|---|---|
 | `VITE_API_BASE` | *(empty: same origin)* | Absolute backend origin for a deployed build, e.g. `https://api.example.org`. WebSocket URLs are derived from it (`http→ws`, `https→wss`). |
-| `TURNSENSE_BACKEND` | `http://localhost:8000` | Dev-server proxy target only. |
+| `TURNSENSE_BACKEND` | `http://127.0.0.1:8000` | Dev-server proxy target only (IPv4 on purpose: `localhost` can resolve to `::1` on Windows and reach a different process). |
 
 The frontend never holds provider keys. The only credential it handles is the short-lived LiveKit room token returned by `POST /api/sessions`. That token is passed straight to `room.connect` and is never stored, logged or displayed.
 

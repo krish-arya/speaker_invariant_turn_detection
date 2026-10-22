@@ -7,7 +7,9 @@ const pkg = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), 
   version: string;
 };
 
-const backend = process.env.TURNSENSE_BACKEND ?? "http://localhost:8000";
+// IPv4 on purpose: uvicorn binds 127.0.0.1, while "localhost" may resolve to ::1 on Windows
+// and reach a different process listening on [::1]:8000.
+const backend = process.env.TURNSENSE_BACKEND ?? "http://127.0.0.1:8000";
 
 export default defineConfig({
   plugins: [react()],

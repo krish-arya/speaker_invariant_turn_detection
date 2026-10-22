@@ -80,9 +80,9 @@ async def test_cancelled_generation_audio_is_never_played():
 def test_clause_chunker_emits_speakable_units():
     c = ClauseChunker(first_min_chars=10, min_chars=20)
     out = []
-    for tok in "Sure, I can help with that. The direct route leaves at nine, and the other one is cheaper.".split(" "):
+    for tok in ["Sure,", "I", "can", "help", "with", "that.", "The", "direct", "route", "leaves", "at", "nine,", "and", "the", "other", "one", "is", "cheaper."]:
         out += c.push(tok + " ")
     out += c.flush()
     assert out[0] == "Sure, I can help with that."
-    assert " ".join(out).split() == "Sure, I can help with that. The direct route leaves at nine, and the other one is cheaper.".split()
+    assert " ".join(out).split() == ["Sure,", "I", "can", "help", "with", "that.", "The", "direct", "route", "leaves", "at", "nine,", "and", "the", "other", "one", "is", "cheaper."]
     assert all(o for o in out)

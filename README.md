@@ -47,8 +47,10 @@ uv pip install --python .venv -e ".[dev,vad,livekit,research]"
 # frontend
 cd frontend
 npm install
-npm run dev                            # → http://localhost:5173 (proxies /api and /ws)
+npm run dev                            # → http://localhost:5173 (proxies /api and /ws to 127.0.0.1:8000)
 ```
+
+If another program already uses port 8000, start the API with `turnsense-api --port 8010` and the console with `TURNSENSE_BACKEND=http://127.0.0.1:8010 npm run dev`.
 
 In the console, choose a detector and a scenario (for example *Pause then continue*), then select **Start session**. The timeline shows VAD activity, detector predictions and committed decisions as separate signals. The **Evaluation** tab runs batches of scripted trials faster than real time. **Results** compares them and exports CSV, JSON or Markdown.
 
@@ -65,6 +67,10 @@ To use the local fallbacks instead (faster-whisper, Ollama, Kokoro-82M), set `TU
 ## Research pipeline
 
 See [docs/research_protocol.md](docs/research_protocol.md) for the experiment design and [docs/annotation_guide.md](docs/annotation_guide.md) for labelling. The CLI entry point is `turnsense-research`. `turnsense-research pipeline --synthetic --quick` runs the synthetic smoke test end to end and writes checkpoints to `backend/checkpoints/`. Once a checkpoint exists, its detector shows up as available in the console.
+
+To score detectors on labelled recordings through the full live pipeline (not only offline), set `TURNSENSE_REPLAY_MANIFEST` and, optionally, `TURNSENSE_REPLAY_SPLIT` in `backend/.env`. The console then offers an **Evaluation set replay** scenario. It replays the split's `test_unseen` recordings, using the seed to pick the recording.
+
+`backend/scripts/run_comparison.py` runs all three detectors through the live pipeline on identical inputs: the scripted scenarios plus held-out-speaker replay. It writes a Markdown report, and the trials also appear in the console.
 
 **Synthetic results are pipeline checks, not evidence.** The synthetic corpus contains a speaker↔timing confound built in on purpose, so it can show whether the anti-transfer mechanism behaves as intended. The research claim needs a licensed, annotated corpus of real conversations with a speaker-disjoint test set.
 
@@ -84,9 +90,9 @@ cd ../frontend && npm test -- --run && npm run build
 | Baseline runs and is measured with a fixed configuration | Done (E0; frozen `EffectiveConfig` with `config_hash` in every trial) |
 | Documented detector event schema wired into the orchestrator | Done (`events.py`, `docs/api-contract.md`) |
 | Barge-in cancels playback; no stale audio afterwards | Done; tested with injected late chunks (`stale_chunks_played` = 0) |
-| Anti-transfer variant implemented, or blocker documented | Implemented; trained only on synthetic data so far (see research protocol) |
+| Anti-transfer variant implemented, or blocker documented | Implemented and trained on synthetic data. Result so far: indistinguishable from the learned control, and the penalty is non-binding ([research protocol §11](docs/research_protocol.md)) |
 | Speaker-disjoint split; dataset and annotation policy documented | Split builder and docs done; real dataset still to be chosen and licensed |
-| Task metrics, delay distribution, cross-speaker comparison, latency | Implemented; real-speaker numbers pending data |
+| Task metrics, delay distribution, cross-speaker comparison, latency | Implemented and exercised end-to-end on synthetic data (offline and through the live pipeline); real-speaker numbers pending data |
 | Frontend shows live state and exports trial metrics and configuration | Done (see frontend/README.md) |
 | API keys and raw audio not exposed or persisted by default | Done (keys server-side only; raw audio never stored; transcripts exported only on opt-in) |
 | Final documentation: failures, limitations, versions, reproduction | Ongoing |

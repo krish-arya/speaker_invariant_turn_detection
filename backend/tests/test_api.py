@@ -3,6 +3,7 @@ import time
 
 import pytest
 from fastapi.testclient import TestClient
+from starlette.websockets import WebSocketDisconnect
 
 from turnsense.api.app import create_app
 from turnsense.config import Settings
@@ -73,7 +74,7 @@ def test_simulated_session_streams_events_and_records_trial(client):
 
 
 def test_unknown_session_websocket_is_rejected(client):
-    with pytest.raises(Exception), client.websocket_connect("/ws/sessions/ses_nope") as ws:
+    with pytest.raises(WebSocketDisconnect), client.websocket_connect("/ws/sessions/ses_nope") as ws:
         ws.receive_text()
 
 

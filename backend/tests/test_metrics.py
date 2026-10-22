@@ -62,3 +62,15 @@ def test_percentiles_respect_minimum_samples_and_ci():
     assert n == 3 and mean == pytest.approx(0.6) and lo < 0.6 < hi
     assert mean_ci95([0.5])[1:3] == (None, None)
     assert mean_ci95([None]) == (None, None, None, 0)
+
+
+def test_interruption_as_agent_finishes_is_not_a_missed_barge_in():
+    # the user starts at 4850; the agent's answer ends by itself at 5000 (< 800 ms window)
+    b = score_barge_ins([(0, 5000)], cancel_commits_ms=[], reference_onsets_ms=[4850], tol=TOL)
+    assert b.yielded_naturally == 1 and b.missed_barge_ins == 0 and b.missed_barge_in_rate is None
+    # still talking when the window closes → genuinely missed
+    b = score_barge_ins([(0, 9000)], cancel_commits_ms=[], reference_onsets_ms=[4850], tol=TOL)
+    assert b.missed_barge_ins == 1 and b.missed_barge_in_rate == 1.0
+    # an interval still open at session end counts as still talking
+    b = score_barge_ins([(0, None)], cancel_commits_ms=[], reference_onsets_ms=[4850], tol=TOL)
+    assert b.missed_barge_ins == 1

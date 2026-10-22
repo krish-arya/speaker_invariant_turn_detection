@@ -28,6 +28,7 @@ from turnsense.detectors.base import DetectorInput, TurnDetector
 from turnsense.detectors.silence import SilenceBaselineDetector
 from turnsense.events import DecisionType, DetectorMode, PolicyConfig, VadConfig
 from turnsense.metrics import ReferenceTurn, Tolerance, percentiles, score_turn_ends
+from turnsense.metrics.turn import DEFAULT_TOLERANCE
 from turnsense.research.data import Recording, Split, load_audio, load_manifest
 
 Log = Callable[[str], None]
@@ -219,7 +220,7 @@ def evaluate(
     log: Log = print,
 ) -> dict:
     policy_cfg = policy_cfg or PolicyConfig()
-    tol = tolerance or Tolerance()
+    tol = tolerance or DEFAULT_TOLERANCE
     detectors = {name: f(policy_cfg) for name, f in factories.items()}
     raw: dict[str, dict[str, list[RecordingResult]]] = {n: defaultdict(list) for n in detectors}
     t0 = time.perf_counter()

@@ -224,15 +224,25 @@ def build_summary(
         m.missed_barge_in_rate = bs.missed_barge_in_rate
         counts.reference_turn_ends = ts.n_reference
         counts.reference_barge_ins = bs.reference_barge_ins
+        if bs.yielded_naturally:
+            notes.append(
+                f"{bs.yielded_naturally} interruption onset(s) came as the agent finished on its own; "
+                "excluded from the missed barge-in rate."
+            )
         notes.extend(resolved.not_applicable)
         if any(d.manual for d in barge_commits):
             notes.append("Manual interrupts are excluded from barge-in scoring.")
     else:
         notes.append("Unlabelled trial: task-quality metrics are not available.")
-    if config.runtime_profile == "simulation":
+    if trial_type == TrialType.SIMULATED:
         notes.append(
             "Simulated providers: STT/LLM/TTS latencies are modelled, not measured; "
             "audio is synthetic and says nothing about real speakers."
+        )
+    elif trial_type == TrialType.REPLAY:
+        notes.append(
+            "Recorded audio replayed through the pipeline with simulated providers: "
+            "turn metrics are real for this recording, provider latencies are modelled."
         )
     if m.stale_chunks_played:
         notes.append(f"{m.stale_chunks_played} stale chunk(s) were played after cancellation.")
