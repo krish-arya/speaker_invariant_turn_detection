@@ -1,0 +1,62 @@
+/*
+ * Design tokens — one well-tuned dark technical-console theme (frontend.md §10).
+ * Text/background pairs meet WCAG AA (body text ≥ 7:1, muted text ≥ 4.5:1).
+ * State colours are never used alone: every use is paired with a label and an icon.
+ */
+:root {
+  color-scheme: dark;
+
+  /* surfaces */
+  --bg: #0c1016;
+  --surface: #131922;
+  --surface-2: #19212c;
+  --surface-3: #212b38;
+  --border: #2b3646;
+  --border-strong: #3b495d;
+
+  /* text */
+  --text: #e7edf4;
+  --text-muted: #a3b0c0;
+  --text-faint: #8796a8;
+
+  /* state colours */
+  --neutral: #a3b0c0;
+  --active: #63b3ff; /* listening / active */
+  --uncertain: #f0b44c; /* possible end / uncertain */
+  --complete: #52c98e; /* committed decision */
+  --agent: #46d3c5; /* assistant speaking */
+  --danger: #ff7a7a; /* errors / cancelled interruption */
+
+  --accent: var(--active);
+  --focus: #ffd166;
+
+  /* type */
+  --font-sans: "Inter", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "JetBrains Mono", "Cascadia Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --fs-xs: 0.75rem;
+  --fs-sm: 0.8125rem;
+  --fs-md: 0.9375rem;
+  --fs-lg: 1.125rem;
+  --fs-xl: 1.5rem;
+  --fs-status: 1.6rem;
+
+  /* spacing & shape */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 14px;
+  --shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 8px 24px rgba(0, 0, 0, 0.25);
+
+  --transition: 140ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --transition: 0ms;
+  }
+}
